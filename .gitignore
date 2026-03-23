@@ -1,2 +1,3 @@
 *.json
-.venv/
+cv_venv/
+.ipynb_checkpoints/

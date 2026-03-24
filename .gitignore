@@ -1,0 +1,9 @@
+*.json
+.ipynb_checkpoints/
+cv_venv/
+latest_onnx_code.py
+new_file.py
+*.ipynb
+task_code.py
+video_read.py
+perfect_glove_crops/

@@ -137,7 +137,7 @@ def vid_processing(vid_path, onnx_path):
             x1, y1, x2, y2 = det['box']
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"Glove: {det['conf']:.2f}", (x1, y1-10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, ), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
         # Show the video feed
         cv2.imshow("Detection Preview", cv2.resize(frame, (1280, 720)))

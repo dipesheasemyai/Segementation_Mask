@@ -52,7 +52,7 @@ def sigmoid(x): return 1 / (1 + np.exp(-x))
 
 def process_frame(frame, in_w, in_h, engine):
     # BALANCE POINT: 0.65 catches gloves without blinking too much
-    CONF_THRESH = 0.65  
+    CONF_THRESH = 0.8  
     IOU_THRESH = 0.45
     
     orig_h, orig_w = frame.shape[:2]
@@ -133,7 +133,7 @@ def vid_processing(vid_path, engine_path):
         for det in detections:
             x1, y1, x2, y2 = det['box']
             # Only save if confidence is decent
-            if det['conf'] > 0.70:
+            if det['conf'] > 0.90:
                 # White background crop logic
                 mask_3d = cv2.merge([det['mask']]*3) / 255.0
                 fg = (det['crop'] * mask_3d).astype(np.uint8)
@@ -143,7 +143,9 @@ def vid_processing(vid_path, engine_path):
                 cv2.imwrite(os.path.join(output_dir, f"g_{frame_count}.jpg"), final_res)
                 frame_count += 1
             
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"Glove: {det['conf']:.2f}", (x1, y1-10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
         # Show smaller window for speed
         cv2.imshow("TRT Fast Preview", cv2.resize(frame, (960, 540)))

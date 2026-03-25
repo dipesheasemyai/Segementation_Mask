@@ -2,4 +2,3 @@ cv_venv/
 latest_onnx_code.py
 perfect_glove_crops/
 cropped_image/
-bounding_box_image.py

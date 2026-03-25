@@ -1,10 +1,46 @@
+"""
+ONNX Video Inference for Glove Segmentation
+-------------------------------------------
+
+Purpose:
+    This script processes a video frame-by-frame using an ONNX model to detect and
+    segment gloves. Detected gloves are cropped with a clean white background and
+    saved as separate images. The script also displays a live preview of detections.
+
+Requirements:
+    - numpy
+    - opencv-python
+    - onnxruntime
+    - os
+
+Usage:
+    Modify the paths at the bottom of the script and run:
+        python onnx_main.py
+"""
+
+
 import cv2
 import numpy as np
 import onnxruntime as ort
 import os
 
+# ----------------------------
+# Step 1: ONNX Model Setup
+# ----------------------------
 
 def onnx_setup(onnx_path):
+    """
+    Initialize ONNX Runtime session and retrieve model input details.
+
+    Parameters:
+        onnx_path (str): Path to the ONNX model file
+
+    Returns:
+        in_h (int): Model input height
+        in_w (int): Model input width
+        model_inputs (list): List of model input tensors
+        session (onnxruntime.InferenceSession): ONNX Runtime session
+    """
     session = ort.InferenceSession(onnx_path, providers=['CPUExecutionProvider'])
     model_inputs = session.get_inputs()
     in_h, in_w = model_inputs[0].shape[2], model_inputs[0].shape[3]
@@ -12,12 +48,36 @@ def onnx_setup(onnx_path):
     return in_h, in_w, model_inputs, session
     
 
+# ----------------------------
+# Step 2: Utility Functions
+# ----------------------------
 def sigmoid(x):
+    """
+    Apply sigmoid activation function.
+
+    Parameters:
+        x (np.ndarray): Input array
+
+    Returns:
+        np.ndarray: Sigmoid output
+    """
     return 1 / (1 + np.exp(-x))
 
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114)):
-    """Resizes image to a square with gray padding to maintain aspect ratio."""
+    """
+    Resize an image to a square while maintaining aspect ratio and adding padding.
+
+    Parameters:
+        im (np.ndarray): Original image
+        new_shape (tuple): Target shape (height, width)
+        color (tuple): Padding color (B, G, R)
+
+    Returns:
+        im (np.ndarray): Resized and padded image
+        ratio (float): Scaling ratio applied to original image
+        (dw, dh) (tuple): Width and height padding added
+    """
     shape = im.shape[:2] # [height, width]
     r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
     new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
@@ -31,8 +91,28 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114)):
     
     return im, r, (dw, dh)
 
+# ----------------------------
+# Step 3: Frame Processing
+# ----------------------------
 
 def process_frame(frame, in_w, in_h, model_inputs, session):
+    """
+    Preprocess a frame, run ONNX inference, apply NMS, generate masks,
+    and produce cropped glove images with a white background.
+
+    Parameters:
+        frame (np.ndarray): Original BGR frame
+        in_w (int): Model input width
+        in_h (int): Model input height
+        model_inputs (list): ONNX model input tensors
+        session (onnxruntime.InferenceSession): ONNX Runtime session
+
+    Returns:
+        results (list): List of detected gloves with keys:
+            - 'clean_crop': Cropped glove image with white background
+            - 'box': Bounding box (x1, y1, x2, y2)
+            - 'conf': Confidence score
+    """
     CONF_THRESH = 0.65
     IOU_THRESH = 0.45
     orig_h, orig_w = frame.shape[:2]
@@ -42,15 +122,17 @@ def process_frame(frame, in_w, in_h, model_inputs, session):
     blob = input_img.astype(np.float32) / 255.0
     blob = blob.transpose(2, 0, 1)[None]
 
-    # Inference
+    # 2. Onnx Inference
     outputs = session.run(None, {model_inputs[0].name: blob})
     preds = np.squeeze(outputs[0]).T 
     protos = np.squeeze(outputs[1]) 
 
+    # 3. Extract boxes, scores, mask coefficients
     boxes = preds[:, :4]
     scores = np.max(preds[:, 4:-32], axis=1)
     mask_coeffs = preds[:, -32:]
 
+    # 4. Filter by confidence
     idx = np.where(scores > CONF_THRESH)[0]
     nms_boxes, nms_scores, nms_coeffs = [], [], []
     for i in idx:
@@ -64,6 +146,7 @@ def process_frame(frame, in_w, in_h, model_inputs, session):
         nms_scores.append(float(scores[i]))
         nms_coeffs.append(mask_coeffs[i])
 
+    # 5. Non-Maximum Suppression
     indices = cv2.dnn.NMSBoxes(nms_boxes, nms_scores, CONF_THRESH, IOU_THRESH)
 
     results = []
@@ -106,7 +189,18 @@ def process_frame(frame, in_w, in_h, model_inputs, session):
             
     return results
 
+# ----------------------------
+# Step 4: Video Processing Loop
+# ----------------------------
+
 def vid_processing(vid_path, onnx_path):
+    """
+    Process a video file using the ONNX model and save cropped glove images.
+
+    Parameters:
+        vid_path (str): Path to input video
+        onnx_path (str): Path to ONNX model
+    """
     output_dir = "perfect_glove_crops"
     os.makedirs(output_dir, exist_ok=True)
     
@@ -133,13 +227,13 @@ def vid_processing(vid_path, onnx_path):
             cv2.imwrite(save_path, det['clean_crop'])
             image_count += 1
             
-            # 2. Draw visual feedback on the preview frame
+            # 2. Draw bounding box on preview
             x1, y1, x2, y2 = det['box']
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"Glove: {det['conf']:.2f}", (x1, y1-10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-        # Show the video feed
+        # Display preview window
         cv2.imshow("Detection Preview", cv2.resize(frame, (1280, 720)))
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -147,6 +241,10 @@ def vid_processing(vid_path, onnx_path):
 
     vid.release()
     cv2.destroyAllWindows()
+
+# ----------------------------
+# Step 5: Run Video Processing
+# ----------------------------
 
 if __name__ == "__main__":
     vid_path = '/home/easemyai/Documents/object_seg/DPL_Sample_Video/Cam 192_168_1_17/20260317105131.ts'

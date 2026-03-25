@@ -98,7 +98,7 @@ def process_video(video_path, model_path):
 
                     if np.any(mask_crop > 0):
                         processed_img = process_glove(crop, mask_crop)
-                        filename = os.path.join(output_folder, f"crop_{image_count}.jpg")
+                        filename = os.path.join(OUTPUT_FOLDER, f"crop_{image_count}.jpg")
                         cv2.imwrite(filename, processed_img)
                         image_count += 1
 

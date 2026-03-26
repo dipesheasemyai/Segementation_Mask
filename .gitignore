@@ -2,3 +2,7 @@ cv_venv/
 latest_onnx_code.py
 perfect_glove_crops/
 cropped_image/
+__pycache__/
+model/
+DPL_Sample_Video/
+utils/
